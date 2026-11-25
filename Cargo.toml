@@ -1,0 +1,20 @@
+[package]
+name = "ecdict"
+version = "1.1.0"
+edition = "2021"
+description = "simple ecdict 离线英汉词典（Windows GUI）"
+license = "MIT"
+authors = ["ecdict"]
+autobins = false
+
+[dependencies]
+eframe = "0.37"
+
+[[bin]]
+name = "ecdict-gui"
+path = "src/bin/ecdict-gui.rs"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
