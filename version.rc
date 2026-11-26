@@ -1,0 +1,28 @@
+1 VERSIONINFO
+FILEVERSION 1,2,0,0
+PRODUCTVERSION 1,2,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Enddleo"
+            VALUE "FileDescription", "simple ecdict - offline English-Chinese dictionary"
+            VALUE "FileVersion", "1.2.0"
+            VALUE "InternalName", "simple-ecdict"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Enddleo"
+            VALUE "OriginalFilename", "ecdict-gui.exe"
+            VALUE "ProductName", "simple ecdict"
+            VALUE "ProductVersion", "1.2.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

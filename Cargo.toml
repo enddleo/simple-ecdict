@@ -1,6 +1,6 @@
 [package]
 name = "ecdict"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "simple ecdict 离线英汉词典（Windows GUI）"
 license = "MIT"
@@ -14,6 +14,9 @@ eframe = { version = "0.37", default-features = false, features = [
     "clipboard",
     "links",
 ] }
+
+[build-dependencies]
+embed-resource = "2"
 
 [[bin]]
 name = "ecdict-gui"

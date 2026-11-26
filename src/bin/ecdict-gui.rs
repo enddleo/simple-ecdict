@@ -21,6 +21,8 @@ fn main() -> eframe::Result {
             .with_inner_size([WIN_WIDTH, 56.0])
             .with_min_inner_size([230.0, 44.0])
             .with_title("simple ecdict")
+            .with_icon(app_icon())
+            .with_maximize_button(false)
             .with_always_on_top(),
         ..Default::default()
     };
@@ -37,6 +39,7 @@ struct App {
     result: Option<String>,
     focus_on_start: bool,
     needs_resize: bool,
+    dark: bool,
     selection: selection::SelectionWatcher,
 }
 
@@ -50,6 +53,7 @@ impl App {
             result: None,
             focus_on_start: true,
             needs_resize: true,
+            dark: false,
             selection: selection::SelectionWatcher::start(cc.egui_ctx.clone()),
         }
     }
@@ -57,10 +61,19 @@ impl App {
 
 impl eframe::App for App {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        egui::Color32::from_rgb(248, 248, 248).to_normalized_gamma_f32()
+        if self.dark {
+            egui::Color32::from_rgb(27, 27, 27).to_normalized_gamma_f32()
+        } else {
+            egui::Color32::from_rgb(248, 248, 248).to_normalized_gamma_f32()
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // 启动时把记住的主题同步到标题栏
+        if self.focus_on_start {
+            set_title_bar_dark(self.dark);
+        }
+
         // 剪贴板监控：处理复制到的英文单词
         while let Some(word) = self.selection.try_recv() {
             self.result = Some(word.clone());
@@ -73,10 +86,32 @@ impl eframe::App for App {
             let search_id = egui::Id::unique("search");
 
             ui.horizontal(|ui| {
+                // 输入框（右侧留出亮暗切换按钮空间）
+                let button_w = 36.0;
+                let input_w = (ui.available_width() - button_w).max(100.0);
+
+                let (bg, border) = if self.dark {
+                    (
+                        egui::Color32::from_rgb(40, 40, 40),
+                        egui::Color32::from_rgb(75, 75, 75),
+                    )
+                } else {
+                    (
+                        egui::Color32::WHITE,
+                        egui::Color32::from_rgb(175, 175, 175),
+                    )
+                };
+                let frame = egui::Frame::new()
+                    .fill(bg)
+                    .stroke(egui::Stroke::new(1.0, border))
+                    .corner_radius(egui::CornerRadius::same(4))
+                    .inner_margin(egui::Margin::symmetric(8, 3));
+
                 let resp = ui.add(
                     egui::TextEdit::singleline(&mut self.input)
                         .id(search_id)
-                        .desired_width(ui.available_width()),
+                        .frame(frame)
+                        .desired_width(input_w),
                 );
 
                 if self.focus_on_start {
@@ -97,6 +132,23 @@ impl eframe::App for App {
                     select_all(ui.ctx(), search_id, &self.input);
                     resp.request_focus();
                     self.needs_resize = true;
+                }
+
+                // 亮暗切换按钮（居中在输入框右缘与界面右缘之间）
+                ui.add_space(7.0);
+                let (icon_rect, icon_resp) = ui.allocate_exact_size(
+                    egui::vec2(22.0, 22.0),
+                    egui::Sense::click(),
+                );
+                draw_theme_icon(ui, icon_rect, self.dark);
+                if icon_resp.clicked() {
+                    self.dark = !self.dark;
+                    ui.ctx().set_visuals(if self.dark {
+                        egui::Visuals::dark()
+                    } else {
+                        egui::Visuals::light()
+                    });
+                    set_title_bar_dark(self.dark);
                 }
             });
 
@@ -130,11 +182,27 @@ impl App {
             ui.label(egui::RichText::new(self.index.word(k)).size(24.0).strong());
             let ph = self.index.phonetic(k);
             if !ph.is_empty() {
-                ui.label(
-                    egui::RichText::new(format!("/{}/", ph))
-                        .size(14.0)
-                        .color(egui::Color32::from_rgb(130, 130, 130)),
-                );
+                // 音标灰色：暗模式下更亮，提升对比度
+                let ph_color = if self.dark {
+                    egui::Color32::from_rgb(185, 185, 185)
+                } else {
+                    egui::Color32::from_rgb(130, 130, 130)
+                };
+                // 顶部留白微调，让音标与单词视觉居中
+                egui::Frame::new()
+                    .inner_margin(egui::Margin {
+                        left: 4,
+                        right: 0,
+                        top: 2,
+                        bottom: 0,
+                    })
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(format!("/{}/", ph))
+                                .size(14.0)
+                                .color(ph_color),
+                        );
+                    });
             }
         });
         ui.separator();
@@ -241,3 +309,74 @@ fn select_all(ctx: &egui::Context, id: egui::Id, text: &str) {
         state.store(ctx, id);
     }
 }
+
+/// 自绘亮暗切换图标：暗色显示太阳，亮色显示月亮（月牙）。
+fn draw_theme_icon(ui: &egui::Ui, rect: egui::Rect, dark: bool) {
+    let center = rect.center();
+    let color = ui.visuals().text_color();
+    if dark {
+        // 太阳：实心圆 + 八条光芒
+        ui.painter().circle_filled(center, 6.0, color);
+        for i in 0..8 {
+            let a = i as f32 * std::f32::consts::TAU / 8.0;
+            let d = egui::vec2(a.cos(), a.sin());
+            ui.painter().line_segment(
+                [center + d * 8.0, center + d * 10.5],
+                egui::Stroke::new(1.5, color),
+            );
+        }
+    } else {
+        // 月亮：实心圆减去一个偏移圆，形成月牙（减去用亮色背景）
+        ui.painter().circle_filled(center, 8.0, color);
+        ui.painter()
+            .circle_filled(center + egui::vec2(4.0, -2.0), 6.5, egui::Color32::from_rgb(248, 248, 248));
+    }
+}
+
+/// 从嵌入的 PNG 加载窗口图标。
+fn app_icon() -> egui::IconData {
+    const PNG: &[u8] = include_bytes!("../../assets/icon.png");
+    eframe::icon_data::from_png_bytes(PNG).unwrap_or_default()
+}
+
+/// 让 Windows 原生标题栏跟随亮/暗模式（沉浸式深色标题栏）。
+#[cfg(windows)]
+fn set_title_bar_dark(dark: bool) {
+    use std::ffi::c_void;
+
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: *mut c_void,
+            attr: u32,
+            value: *const c_void,
+            size: u32,
+        ) -> i32;
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn FindWindowW(class: *const u16, window: *const u16) -> *mut c_void;
+    }
+
+    unsafe {
+        let title: Vec<u16> = "simple ecdict"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
+        if !hwnd.is_null() {
+            let v: i32 = if dark { 1 } else { 0 };
+            // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            let _ = DwmSetWindowAttribute(
+                hwnd,
+                20,
+                &v as *const i32 as *const c_void,
+                4,
+            );
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn set_title_bar_dark(_dark: bool) {}
