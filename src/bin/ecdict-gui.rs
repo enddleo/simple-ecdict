@@ -270,9 +270,9 @@ impl App {
     }
 }
 
-/// 加载 Windows 系统中文字体，保证中文释义正常显示。
+/// 加载 Windows 系统中文字体 + 含 IPA 音标的拉丁字体，保证中文释义与音标都正常显示。
 fn install_cjk_font(ctx: &egui::Context) {
-    const CANDIDATES: &[&str] = &[
+    const CJK_CANDIDATES: &[&str] = &[
         "C:\\Windows\\Fonts\\simhei.ttf",  // 黑体 (TTF)
         "C:\\Windows\\Fonts\\Deng.ttf",    // 等线 (TTF)
         "C:\\Windows\\Fonts\\simfang.ttf", // 仿宋 (TTF)
@@ -282,24 +282,51 @@ fn install_cjk_font(ctx: &egui::Context) {
         "C:\\Windows\\Fonts\\simsun.ttc",  // 宋体 (TTC)
         "C:\\Windows\\Fonts\\msjh.ttc",    // JhengHei (TTC)
     ];
-    for path in CANDIDATES {
+    // 含 IPA 音标字符（ə ʃ ʊ ɪ 等）的拉丁字体，作为音标回退
+    const LATIN_CANDIDATES: &[&str] = &[
+        "C:\\Windows\\Fonts\\arial.ttf",   // Arial（含 IPA 扩展）
+        "C:\\Windows\\Fonts\\segoeui.ttf", // Segoe UI（含 IPA）
+        "C:\\Windows\\Fonts\\times.ttf",   // Times New Roman（含 IPA）
+    ];
+
+    let mut fonts = egui::FontDefinitions::default();
+
+    let mut cjk_loaded = false;
+    for path in CJK_CANDIDATES {
         if let Ok(bytes) = std::fs::read(path) {
-            let mut fonts = egui::FontDefinitions::default();
             fonts
                 .font_data
                 .insert("cjk".to_owned(), egui::FontData::from_owned(bytes).into());
-            for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-                fonts
-                    .families
-                    .entry(family)
-                    .or_default()
-                    .insert(0, "cjk".to_owned());
-            }
-            ctx.set_fonts(fonts);
-            return;
+            cjk_loaded = true;
+            break;
         }
     }
-    eprintln!("警告: 未找到中文字体，中文可能显示为方框");
+
+    let mut latin_loaded = false;
+    for path in LATIN_CANDIDATES {
+        if let Ok(bytes) = std::fs::read(path) {
+            fonts
+                .font_data
+                .insert("latin".to_owned(), egui::FontData::from_owned(bytes).into());
+            latin_loaded = true;
+            break;
+        }
+    }
+
+    if cjk_loaded || latin_loaded {
+        for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+            let fam = fonts.families.entry(family).or_default();
+            if cjk_loaded {
+                fam.insert(0, "cjk".to_owned());
+            }
+            if latin_loaded {
+                fam.push("latin".to_owned());
+            }
+        }
+        ctx.set_fonts(fonts);
+    } else {
+        eprintln!("警告: 未找到中文字体，中文可能显示为方框");
+    }
 }
 
 /// 全选指定 TextEdit 中的文本。
