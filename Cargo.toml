@@ -8,13 +8,19 @@ authors = ["ecdict"]
 autobins = false
 
 [dependencies]
-eframe = "0.37"
+eframe = { version = "0.37", default-features = false, features = [
+    "glow",
+    "default_fonts",
+    "clipboard",
+    "links",
+] }
 
 [[bin]]
 name = "ecdict-gui"
 path = "src/bin/ecdict-gui.rs"
 
 [profile.release]
-opt-level = 3
-lto = "thin"
+opt-level = "z"
+lto = true
 strip = true
+codegen-units = 1
